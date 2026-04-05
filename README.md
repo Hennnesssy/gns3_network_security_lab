@@ -22,24 +22,24 @@ To ensure continuous operation (High Availability), the fundamental element of t
     
 **Table x.x. Physical connection map in the GNS3 environment**
 
-| Device | Interface | Connected to | Port |
+| Device | Port | Connected to | Port |
 | :--- | :--- | :--- | :--- |
-| Router1 | ens0 | Switch1 | e0 |
-| | ens1 | Switch2 | e0 |
-| Router2 | ens0 | Switch1 | e1 |
-| | ens1 | Switch2 | e1 |
-| | ens2 | Switch3 | e0 |
-| | ens3 | Switch4 | e0 |
-| | ens4 | Switch5 | e0 |
+| Router1 | e0 | Switch1 | e0 |
+| | e1 | Switch2 | e0 |
+| Router2 | e0 | Switch1 | e1 |
+| | e1 | Switch2 | e1 |
+| | e2 | Switch3 | e0 |
+| | e3 | Switch4 | e0 |
+| | e4 | Switch5 | e0 |
 | Jumphost1 | ens0 | Switch1 | e2 |
-| | ens1 | Switch2 | e2 |
+| | e1 | Switch2 | e2 |
 | User1 | ens0 | Switch3 | e1 |
-| | ens1 | Switch4 | e1 |
+| | e1 | Switch4 | e1 |
 | Server1 | ens0 | Switch3 | e2 |
-| | ens1 | Switch4 | e2 |
-| | ens2 | Switch5 | e1 |
-| Switch Connect | Switch1 e7 | Switch2 | e7 |
-| Switch Connect | Switch3 e7 | Switch4 | e7 |
+| | e1 | Switch4 | e2 |
+| | e2 | Switch5 | e1 |
+| Switch1 |  e7 | Switch2 | e7 |
+| Switch3 |  e7 | Switch4 | e7 |
 
 ## 2. Logical Segmentation (VLAN - 802.1Q)
 
@@ -72,7 +72,8 @@ The project utilizes a hierarchical routing model with two circuits:
 | :-------- | :---------------- | :------ | :---------------- | :--------------- |
 | Router1   | bond0.10          | 10      | 10.0.10.1/30      | routers          |
 |           | bond0.2           | 2       | 10.0.2.1/29       | dmz              |
-|           | ens2              | -       | 172.16.2.x/30     | external         |
+|           | ens5              | -       | 172.16.1.2/24     | external         |
+|           | ens6              | -       | 10.10.10.2/24     | external         |
 | jumphost1 | bond0.2           | 2       | 10.0.2.2/29       | dmz              |
 | Router2   | bond0.10          | 10      | 10.0.10.2/30      | routers          |
 |           | bond0.2           | 2       | 10.0.2.3/29       | dmz              |
@@ -125,3 +126,30 @@ Internal production servers are located in their own isolated segment (VLAN 4).
 Standard user traffic is generated on workstations and moves within its dedicated network segment (VLAN 3).
 * **Path:** The flow originates from the user and reaches Router 2, which acts as the default gateway (via `bond1.3`). If a user requires internet access, Router 2 forwards this traffic through the transit network (VLAN 10) to the external Router 1, where Network Address Translation (NAT/Masquerading) occurs.
 * **Goal:** Isolating the user segment solves two problems simultaneously. First, security: users do not have direct access to servers and management equipment. Second, performance: reducing the size of the broadcast domain ensures that "noise" from user devices does not burden the processors of servers and network equipment.
+
+## Security Hardening & Access Control
+
+In terms of security hardening, the following configurations were implemented on the virtual machines to secure access, isolate services, and prevent attacks:
+1. SSH Hardening
+
+    Disabling root login: In the /etc/ssh/sshd_config file, the PermitRootLogin parameter is set to no. This significantly complicates brute-force attacks for bots, as they must guess the username in addition to the password.
+
+    Disabling password authentication: The PasswordAuthentication parameter is set to no, allowing connections exclusively via pre-generated SSH keys, thereby eliminating the vast majority of automated dictionary attacks.
+
+    Restricting listening interfaces (ListenAddress): The SSH server is configured to accept connections only on specific IP addresses belonging to the isolated management network (Management VLAN). For example, ListenAddress 10.0.5.2 is specified for the server and ListenAddress 10.0.5.1 for the router.
+
+    Using non-standard external ports: For external connections, port forwarding (DNAT) is configured from a non-standard port (e.g., 17777) to the internal port 22 to avoid mass scanning of the default SSH port on the public internet.
+
+2. Firewall Configuration (Firewalld) & Zoning
+
+    Security zone distribution: The infrastructure is divided into logical zones (dmz, management, routers, servers, users). If one machine is compromised, an attacker cannot easily spread the attack to others (the mitigation principle). Internet-accessible machines are isolated in a Demilitarized Zone (DMZ).
+
+    Blocking public SSH access: The ssh service was strictly removed from the external and dmz zones to prevent direct connections to routers or servers. The ssh service is permitted only in the dedicated management zone.
+
+    Granular policies (Rich Rules): Strict policies are configured to allow traffic between zones. Instead of granting full access, a detailed rich rule is implemented that allows TCP port 22 access exclusively from the specific Jump Host address (10.0.2.2) to the target server (10.0.5.2).
+
+3. Attack Surface Minimization via Jump Host
+
+    Single Point of Entry: Implemented the concept of accessing the infrastructure through a single intermediary node (Jump Host / Bastion Host). This means only one host is exposed to the "outside," and all intrusion attempts will be directed solely at it. The rest of the infrastructure remains invisible and inaccessible from the internet.
+
+    Key Segmentation: Configured the use of separate SSH key pairs—one for logging into the Jump Host and another for accessing the final servers from it—further segmenting access. Keys are deployed under a standard non-privileged user account rather than root.
