@@ -104,8 +104,26 @@ A Jumphost is a specialized intermediary node (Bastion Host) located in an isola
 
     External Access Mechanism: Access to the Jumphost from the Internet is established through the external router (Router1). When a user connects to the external interface of Router1 on a non-standard port (port 17777), configured Firewall and NAT (DNAT) rules redirect this traffic to the Jumphost. The Jumphost, in turn, communicates with Router2, which uses Policy-Based Routing (PBR) rules to forward the traffic to Server1 via an out-of-band management (mgmt) link on VLAN 5.
     
-## Table 
+### 🔀 Logical Network Segmentation and Traffic Routing (Traffic Flow & Segmentation)
+
 ![traffic](./images/user_traffic.png)
-- red
--
--
+
+One of the key objectives of this project is to guarantee security and fault tolerance through strict traffic segmentation. To prevent unauthorized lateral movement of threats within the network, the infrastructure is divided into isolated logical zones (VLANs), and access control is implemented using the concepts of least privilege and defense in depth. 
+
+The diagram above illustrates three independent traffic flows, which are logically separated:
+
+⚫ **Black arrows — Administrator Traffic (Logically Segmented Management & Jump Host)**
+Administrator traffic is strictly separated from general user data flows. In accordance with security best practices, direct internet access to internal servers is prohibited.
+* **Path:** The administrator connects exclusively through a specialized intermediary node — a Jumphost (Bastion Host) located in the Demilitarized Zone (DMZ). From there, traffic is routed to the internal management server, which has access to the logically isolated management network (Management VLAN).
+* **Technology:** Utilizes exclusively SSH authentication via asymmetric RSA/Ed25519 keys (passwordless) and automated cascaded tunnel forwarding via the `ProxyJump` option.
+* **Goal:** Implementation of logical separation between the management plane and the data plane (In-Band management with strict VLAN isolation). While sharing physical infrastructure, this strict logical segmentation ensures administrators maintain secure, dedicated access channels, significantly reducing the risk of interference from standard user traffic and protecting management interfaces from unauthorized access.
+
+🔴 **Red arrows — Server Traffic (Server Zone - VLAN 4)**
+Internal production servers are located in their own isolated segment (VLAN 4).
+* **Path:** Access to the servers is routed through the central core of the internal network — Router 2 (via the aggregated interface `bond1.4`).
+* **Goal:** The servers reside in a trusted internal zone of the Firewalld firewall, allowing them to communicate freely with each other and databases while protecting them from direct exposure to external networks and users. This minimizes the "blast radius" in the event of a potential security breach.
+
+🟠 **Orange arrows — User Traffic (User Zone - VLAN 3)**
+Standard user traffic is generated on workstations and moves within its dedicated network segment (VLAN 3).
+* **Path:** The flow originates from the user and reaches Router 2, which acts as the default gateway (via `bond1.3`). If a user requires internet access, Router 2 forwards this traffic through the transit network (VLAN 10) to the external Router 1, where Network Address Translation (NAT/Masquerading) occurs.
+* **Goal:** Isolating the user segment solves two problems simultaneously. First, security: users do not have direct access to servers and management equipment. Second, performance: reducing the size of the broadcast domain ensures that "noise" from user devices does not burden the processors of servers and network equipment.
