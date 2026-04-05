@@ -91,3 +91,21 @@ Security is implemented following the principles of attack surface reduction and
 - **Rich Rules:** Inter-zone traffic is selectively allowed. For example, access to the management network is permitted exclusively from the Jump Host's IP address to the SSH port.
     
 - **Jump Host (Bastion):** The only allowed path for remote infrastructure management. Direct access to servers or routers is not possible. Management is performed in a cascade manner using `ProxyJump` with SSH cryptographic keys. Password authentication and direct root access are completely disabled.
+
+---
+
+## JUMPHOST (Bastion Host)
+
+![Jumphost](./images/jumphost.png)
+
+A Jumphost is a specialized intermediary node (Bastion Host) located in an isolated DMZ (VLAN 2). It serves as the single secure entry point for infrastructure administration.
+
+    Purpose: Secure remote infrastructure administration, attack surface minimization (disabling password authentication, allowing access only via SSH keys), and strict traffic segmentation.
+
+    External Access Mechanism: Access to the Jumphost from the Internet is established through the external router (Router1). When a user connects to the external interface of Router1 on a non-standard port (port 17777), configured Firewall and NAT (DNAT) rules redirect this traffic to the Jumphost. The Jumphost, in turn, communicates with Router2, which uses Policy-Based Routing (PBR) rules to forward the traffic to Server1 via an out-of-band management (mgmt) link on VLAN 5.
+    
+## Table 
+![traffic](./images/user_traffic.png)
+- red
+-
+-
