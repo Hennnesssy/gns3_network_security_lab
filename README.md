@@ -96,17 +96,15 @@ Security is implemented following the principles of attack surface reduction and
 
 ## JUMPHOST (Bastion Host)
 
-![Jumphost](./images/jumphost.png)
-
 A Jumphost is a specialized intermediary node (Bastion Host) located in an isolated DMZ (VLAN 2). It serves as the single secure entry point for infrastructure administration.
 
     Purpose: Secure remote infrastructure administration, attack surface minimization (disabling password authentication, allowing access only via SSH keys), and strict traffic segmentation.
 
     External Access Mechanism: Access to the Jumphost from the Internet is established through the external router (Router1). When a user connects to the external interface of Router1 on a non-standard port (port 17777), configured Firewall and NAT (DNAT) rules redirect this traffic to the Jumphost. The Jumphost, in turn, communicates with Router2, which uses Policy-Based Routing (PBR) rules to forward the traffic to Server1 via an out-of-band management (mgmt) link on VLAN 5.
     
-### 🔀 Logical Network Segmentation and Traffic Routing (Traffic Flow & Segmentation)
+### Logical Network Segmentation and Traffic Routing (Traffic Flow & Segmentation)
 
-![traffic](./images/user_traffic.png)
+![traffic](./images/traffic.png)
 
 One of the key objectives of this project is to guarantee security and fault tolerance through strict traffic segmentation. To prevent unauthorized lateral movement of threats within the network, the infrastructure is divided into isolated logical zones (VLANs), and access control is implemented using the concepts of least privilege and defense in depth. 
 
